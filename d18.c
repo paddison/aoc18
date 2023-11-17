@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,18 +40,16 @@ void map_print(Map* map) {
     }
 }
 
-void count_adjacent(Map* map, size_t x, size_t y, size_t adj[3]) {
+void map_count_adjacent(Map* map, size_t x, size_t y, size_t adj[3]) {
     size_t ystart = !y ? y : y - 1;
     size_t yend = y == map->h - 1 ? y : y + 1;
     size_t xstart = !x ? x : x - 1;
     size_t xend = x == map->w - 1 ? x : x + 1;
 
-    //printf("%zu, %zu\n", x, y);
     for (size_t yy = ystart; yy <= yend; ++yy) {
         for (size_t xx = xstart; xx <= xend; ++xx) {
             if (yy == y && xx == x) continue;
 
-            //printf("%zu, %zu\n", xstart, ystart);
             switch (map->m[yy * map->w + xx]) {
                 case '.': ++adj[0]; break;
                 case '|': ++adj[1]; break;
@@ -59,20 +58,17 @@ void count_adjacent(Map* map, size_t x, size_t y, size_t adj[3]) {
             }
         }
     }
-    //printf("\n");
 }
 
 void map_step(Map* map) {
     char* next = malloc(sizeof(char) * map->w * map->h);
-
-    memcpy(next, map->m, sizeof(char) * map->w * map->h);
 
     for (size_t y = 0; y < map->h; ++y) {
         for (size_t x = 0; x < map->w; ++x) {
             size_t adj[3] = { 0, 0, 0 };
             size_t pos = y * map->w + x;
 
-            count_adjacent(map, x, y, adj);
+            map_count_adjacent(map, x, y, adj);
 
             switch (map->m[pos]) {
                 case '.': if (adj[1] >= 3) next[pos] = '|';
@@ -127,52 +123,46 @@ size_t calc_n_trees_n_lumbers(Map* map) {
     return n_trees * n_lumber;
 }
 
-Period period_determine(Map* map) {
-    Period period = { 0 };
-    size_t numbers[1000];
-    size_t len = 0;
-
-    for (size_t i = 0; i < 1000; ++i) {
-        map_step(map);
+Period* period_determine(Period* period, Map* map, 
+                         size_t len, size_t numbers[len]) {
+    for (size_t i = 0; i < len; ++i) {
         numbers[i] = calc_n_trees_n_lumbers(map);
-        printf("i: %zu\tn: %zu\n", i, numbers[i]);
-        if (i == 10) printf("Part 1: %zu\n", calc_n_trees_n_lumbers(map));
+        map_step(map);
+        if (i == 10) printf("Part 1: %zu\n", numbers[i]);
     }
     
-    for (size_t i = 0; i < 1000; ++i) {
-        for (size_t j = i + 1; j < 1000; ++j) {
+    for (size_t i = 0; i < len; ++i) {
+        for (size_t j = i + 1; j < len; ++j) {
             if (numbers[i] == numbers[j]) {
                 size_t start = numbers[i];
-                size_t k = 0;
-                while (++k) {
-                    if (numbers[k + i] != numbers[k + j]) {
-                        break;
-                    }
-                    if (numbers[k + i] == start) {
-                        printf("s:%zu\tl:%zu\n", i, k);
-                        period.start = i;
-                        period.len = k;
+
+                for (size_t k = 1; numbers[k + i] == numbers[k + j]; ++k) {
+                    if (numbers[k + i] == start && numbers[k + j] == start) {
+                        period->start = i;
+                        period->len = k;
                         return period;
                     }
+
                 }
             }
         }
     }
 
-    return period;
+    return 0;
 }
 
 
 int main(void) {
     Map map;
+    Period period;
+    size_t numbers[1000];
 
     map_init(&map, 50);
     parse_input(INP, &map);
+    period_determine(&period, &map, 1000, numbers);
 
-    printf("%zu\n", calc_n_trees_n_lumbers(&map));
+    printf("Part 2: %zu\n", 
+            numbers[period.start + ((1000000000 - period.start) % period.len)]);
 
-    Period period = period_determine(&map);
-
-    printf("start: %zu\tlen: %zu", period.start, period.len);
     return EXIT_SUCCESS;
 }
