@@ -1,9 +1,5 @@
-#include <limits.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 
 int main(void) {
     size_t e = 0, b;
@@ -20,10 +16,11 @@ int main(void) {
         for (size_t j = 0; j < i; ++j) {
             if (seen[j] == e) { 
                 printf("Part 2: %zu\n", seen[i - 1]);
-                return 1;
+                return EXIT_SUCCESS;
             }
         }
         seen[i] = e;
         if (i == 0) printf("Part 1: %zu\n", e);
     }
+    return EXIT_SUCCESS;
 }

@@ -94,7 +94,6 @@ void choose_targets(size_t n_atk, Group atk[n_atk], size_t targets[n_atk],
     for (size_t i = 0; i < n_atk; ++i) {
         // ignore groups which are dead
         if (atk[i].units <= 0) continue;
-        //printf("%d\n", atk[i].init);
         int max = -1;
         size_t max_id = -1;
         for (size_t j = 0; j < n_def; ++j) {
@@ -120,7 +119,6 @@ void choose_targets(size_t n_atk, Group atk[n_atk], size_t targets[n_atk],
             }
         }
         if (max_id != -1) {
-            //printf("%d chooses %d\n", atk[i].init, def[max_id].init);
             targets[i] = max_id;
             selected[max_id] = 1;
         }
@@ -154,40 +152,41 @@ int target_selection(size_t n_immun, size_t n_infect,
     return 0;
 }
 
-void execute_attack(Group* atk, Group* def) {
+int execute_attack(Group* atk, Group* def) {
     // BAM BAM
     int dmg = calc_damage(atk, def);
     int units_killed = dmg / def->hp;
-    printf("%d attacks %d: %d damage, killing %d units\n", atk->init, def->init, dmg, units_killed);
     def->units -= units_killed;
+    return units_killed;
 }
 
-void attack(size_t n_immun, size_t n_infect,
+int attack(size_t n_immun, size_t n_infect,
             Group immun[n_immun], size_t immun_targets[n_immun],
             Group infect[n_infect], size_t infect_targets[n_infect]) {
     // since we cannot sort the groups again, we manually detect which group is next
     // initiative is sort of an id, so just start from n_immun + n_infect and go down
     // calculate battle plan for each Group
+    size_t total_killed = 0;
     
     for (size_t i = n_immun + n_infect; i > 0; --i) {
         for (size_t j = 0; j < n_immun; ++j) {
             if (immun[j].init == i && immun[j].units > 0 && immun_targets[j] != -1) 
-                execute_attack(&immun[j], &infect[immun_targets[j]]);
+                total_killed += execute_attack(&immun[j], &infect[immun_targets[j]]);
         }
         for (size_t j = 0; j < n_infect; ++j) {
             if (infect[j].init == i && infect[j].units > 0 && infect_targets[j] != -1) 
-                execute_attack(&infect[j], &immun[infect_targets[j]]);
+                total_killed += execute_attack(&infect[j], &immun[infect_targets[j]]);
         }
     }
-    printf("\n");
+    return total_killed;
 }
 
-void do_round(size_t n_immun, size_t n_infect, 
+int do_round(size_t n_immun, size_t n_infect, 
               Group immun[n_immun], Group infect[n_infect]) {
     size_t immun_targets[n_immun];
     size_t infect_targets[n_infect];
     target_selection(n_immun, n_infect, immun, immun_targets, infect, infect_targets);
-    attack(n_immun, n_infect, immun, immun_targets, infect, infect_targets);
+    return attack(n_immun, n_infect, immun, immun_targets, infect, infect_targets);
 }
 
 int calc_score(size_t n, Group win[n]) {
@@ -206,10 +205,13 @@ int has_lost(size_t n, Group g[n]) {
 }
 
 int do_battle(size_t n_immun, size_t n_infect, 
-              Group immun[n_immun], Group infect[n_infect]) {
+              Group immun[n_immun], Group infect[n_infect], int part1) {
     while (1) {
-        do_round(n_immun, n_infect, immun, infect); 
-        if (has_lost(n_immun, immun)) return calc_score(n_infect, infect);
+        if (!do_round(n_immun, n_infect, immun, infect)) return -1;
+        if (has_lost(n_immun, immun)) { 
+            if (part1)  return calc_score(n_infect, infect); 
+            else return -1;
+        } 
         if (has_lost(n_infect, infect)) return calc_score(n_immun, immun);
     }
 }
@@ -247,8 +249,6 @@ void parse_group(char line[static 1], Group* g) {
             g->n_weak = 0;
         }
         g->atk_t = str_to_type(atk_t);
-        group_print(g);
-        printf("\n");
         free(weak);
 }
 
@@ -262,8 +262,6 @@ size_t parse_input(char input[static 1], size_t n_immun, size_t n_infect, Group 
         return 0;
     }
     fgets(line, 256 ,f);
-    printf("%s", line);
-    //assert(!strcmp(line, "Immune System:"));
 
     for (size_t i = 0; i < n_immun; ++i) {
         fgets(line, 256 ,f);
@@ -273,8 +271,6 @@ size_t parse_input(char input[static 1], size_t n_immun, size_t n_infect, Group 
     fgets(line, 256, f);
     fgets(line, 256, f);
     
-    printf("%s", line);
-
     for (size_t i = 0; i < n_infect; ++i) {
         fgets(line, 256, f);
         parse_group(line, &infect[i]);
@@ -283,15 +279,38 @@ size_t parse_input(char input[static 1], size_t n_immun, size_t n_infect, Group 
     return 1;
 }
 
+void apply_boost(size_t n_immun, Group immun[n_immun]) {
+    for (size_t i = 0; i < n_immun; ++i) ++immun[i].atk;
+}
+
 int main(void) {
-    const size_t N = 2;
+    const size_t N = 10;
     Group immun[N] = { 0 };
     Group immun_const[N] = { 0 };
     Group infect[N] = { 0 };
     Group infect_const[N] = { 0 };
-    parse_input(TEST, N, N, immun_const, infect_const);
+    parse_input(INP, N, N, immun_const, infect_const);
 
-    printf("Part 1: %d\n", do_battle(N, N, immun_const, infect_const));
+    memcpy(immun, immun_const, sizeof(Group) * N);
+    memcpy(infect, infect_const, sizeof(Group) * N);
+
+    printf("Part 1: %d\n", do_battle(N, N, immun, infect, 1));
+
+    while (1) {
+        memcpy(immun, immun_const, sizeof(Group) * N);
+        memcpy(infect, infect_const, sizeof(Group) * N);
+        if (do_battle(N, N, immun, infect, 0) == -1) {
+            apply_boost(N, immun_const);
+        } else {
+            int n_units = 0;
+            for (size_t i = 0; i < N; ++i) {
+                if (immun[i].units > 0) n_units += immun[i].units;
+            }
+            printf("Part 2: %d\n", n_units);
+            break;
+        }
+    }
+
 
     return EXIT_SUCCESS;
 }
