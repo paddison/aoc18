@@ -286,10 +286,12 @@ size_t parse_input(char input[static 1], size_t n_immun, size_t n_infect, Group 
 int main(void) {
     const size_t N = 2;
     Group immun[N] = { 0 };
+    Group immun_const[N] = { 0 };
     Group infect[N] = { 0 };
-    parse_input(TEST, N, N, immun, infect);
+    Group infect_const[N] = { 0 };
+    parse_input(TEST, N, N, immun_const, infect_const);
 
-    printf("Part 1: %d\n", do_battle(N, N, immun, infect));
+    printf("Part 1: %d\n", do_battle(N, N, immun_const, infect_const));
 
     return EXIT_SUCCESS;
 }
